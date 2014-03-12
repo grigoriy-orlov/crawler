@@ -5,4 +5,11 @@
 /nbproject/*
 /target/
 /.idea/
-/cybermonitor.iml
+*.iml
+*.ipr
+*.iws
+.idea
+.classpath
+.settings
+.project
+
