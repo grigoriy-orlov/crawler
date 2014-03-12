@@ -8,5 +8,5 @@ import java.net.URL;
 public interface PageRequester {
 
 	@NotNull
-	void getPage(@NotNull URL url) throws IOException;
+	String getPage(@NotNull URL url) throws IOException;
 }

@@ -8,5 +8,5 @@ import java.util.List;
 public interface LinkExtractor {
 
 	@NotNull
-	List<String> getLinks(@NotNull URL url);
+	List<URL> getLinks(@NotNull String url);
 }
