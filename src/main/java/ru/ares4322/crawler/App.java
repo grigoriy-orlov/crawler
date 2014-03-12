@@ -20,11 +20,5 @@ public class App {
 		} catch (Exception e) {
 			log.error("crawler starting error: {}", e);
 		}
-
-		try {
-			crawler.stop();
-		} catch (Exception e) {
-			log.error("crawler stopping error: {}", e);
-		}
 	}
 }
