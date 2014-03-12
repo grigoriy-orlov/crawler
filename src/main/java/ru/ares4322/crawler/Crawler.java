@@ -1,7 +1,7 @@
 package ru.ares4322.crawler;
 
 public interface Crawler {
-	void start();
+	void start() throws Exception;
 
-	void stop();
+	void stop() throws Exception;
 }

@@ -1,22 +1,30 @@
 package ru.ares4322.crawler;
 
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
+import com.google.inject.Injector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static com.google.inject.Guice.createInjector;
 
 public class App {
+	private static final Logger log = LoggerFactory.getLogger(App.class);
+
+	//TODO implements Daemon
 	public static void main(String[] args) {
-		//@todo Сделать разные парсеры командной строки и валидаторы ввода
 
-		String startPath = args[0];
+		Injector injector = createInjector();
 
-		BlockingQueue<String> pageQueue = new ArrayBlockingQueue<>(100, true);
-		BlockingQueue<String> urlQueue = new ArrayBlockingQueue<>(100, true);
+		Crawler crawler = injector.getInstance(Crawler.class);
+		try {
+			crawler.start();
+		} catch (Exception e) {
+			log.error("crawler starting error: {}", e);
+		}
 
-		HttpClient httpClient = new HttpClient(startPath, pageQueue);
-
-		new Thread(new HttpClient(startPath, pageQueue)).start();  //одного потока хватит, так как NIO
-
-		//ExecutorService fixedThreadPool = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() - 1);
-		//fixedThreadPool.
+		try {
+			crawler.stop();
+		} catch (Exception e) {
+			log.error("crawler stopping error: {}", e);
+		}
 	}
 }
