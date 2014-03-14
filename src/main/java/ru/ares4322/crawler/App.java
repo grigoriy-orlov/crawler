@@ -11,6 +11,7 @@ public class App {
 
 	//TODO implements Daemon
 	public static void main(String[] args) {
+		log.debug("start app");
 
 		Injector injector = createInjector();
 

@@ -18,7 +18,7 @@ public class CrawlerImpl extends AbstractExecutionThreadService implements Crawl
 	private static final Logger log = LoggerFactory.getLogger(CrawlerImpl.class);
 	private final static int URL_QUEUE_SIZE = 10;
 	private final static int PAGE_QUEUE_SIZE = 10;
-	private final static int CONTOL_SEMAPHORE_PERMITS = 2;
+	private final static int CONTROL_SEMAPHORE_PERMITS = 2;
 	@Inject
 	private PageRequesterService requesterService;
 	@Inject
@@ -30,7 +30,7 @@ public class CrawlerImpl extends AbstractExecutionThreadService implements Crawl
 
 		BlockingQueue<URL> urlQueue = newArrayBlockingQueue(URL_QUEUE_SIZE);
 		BlockingQueue<String> pageQueue = newArrayBlockingQueue(PAGE_QUEUE_SIZE);
-		Semaphore controlSemaphore = new Semaphore(CONTOL_SEMAPHORE_PERMITS);
+		Semaphore controlSemaphore = new Semaphore(CONTROL_SEMAPHORE_PERMITS);
 
 		requesterService.setInputQueue(urlQueue);
 		requesterService.setOutputQueue(pageQueue);
@@ -41,12 +41,13 @@ public class CrawlerImpl extends AbstractExecutionThreadService implements Crawl
 
 		urlQueue.add(new URL("http://navtelecom.ru"));    //TODO add start url
 
-		extractorService.startAsync();
-		requesterService.startAsync();
+		requesterService.startAsync().awaitRunning();
+		extractorService.startAsync().awaitRunning();
 
 		while (true) {
 			try {
 				controlSemaphore.acquire(2);
+				log.debug("control semaphore acquire");
 				break;
 			} catch (InterruptedException e) {
 				log.error("interrupt on controlSemaphore acquiring: {}", e);

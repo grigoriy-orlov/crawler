@@ -27,20 +27,27 @@ public class LinkExtractorServiceImpl extends AbstractExecutionThreadService imp
 
 	private static final Logger log = getLogger(LinkExtractorServiceImpl.class);
 	private static final int OUTPUT_QUEUE_READD_TIMEOUT_MS = 5000;
-	private static final int INTPUT_QUEUE_TAKE_TIMEOUT_MS = 1000;
-	private static final int THREADS = 2;
+	private static final int INTPUT_QUEUE_TAKE_TIMEOUT_MS = 10000;
+	private static final int THREADS = 4;
 	private BlockingQueue<String> inputQueue;
 	private BlockingQueue<URL> outputQueue;
 	private boolean mustStop = false;
 	private Semaphore controlSemaphore;
 
 	@Override
-	public void run() {
+	protected void startUp() throws Exception {
+		log.debug("start up link extractor");
+
 		try {
-			controlSemaphore.acquire();
+			controlSemaphore.acquire(1);
 		} catch (InterruptedException e) {
 			log.error("control semaphore acquire interrupted exception: {}", e);
 		}
+	}
+
+	@Override
+	public void run() {
+		log.debug("run link extractor");
 
 		ExecutorService executor = newFixedThreadPool(THREADS, new ThreadFactoryBuilder().setNameFormat("link-extractor-%d").build());
 
@@ -53,6 +60,7 @@ public class LinkExtractorServiceImpl extends AbstractExecutionThreadService imp
 					controlSemaphore.release();
 					return;
 				}
+				log.debug("get new page for extracting");
 			} catch (InterruptedException e) {
 				log.error("page getting from queue interrupted exception: {}", e);
 				continue;
@@ -60,15 +68,18 @@ public class LinkExtractorServiceImpl extends AbstractExecutionThreadService imp
 			executor.submit(new Runnable() {
 				@Override
 				public void run() {
+					log.debug("start link extractor task");
+
 					Document doc = Jsoup.parse(page);
 					Element body = doc.body();
 					body.traverse(new NodeVisitor() {
 						public void head(Node node, int depth) {
-							if ("link".equals(node.nodeName())) {    //TODO add other links node parsing
+							if ("a".equals(node.nodeName())) {    //TODO add other links node parsing
 								String href = node.attr("href");
 								if (null != href) {
 									try {
-										while (!outputQueue.add(new URL(href))) {
+										log.debug("try add link to queue");
+										while (!outputQueue.offer(new URL(href))) {
 											log.debug("output queue is full");
 											try {
 												sleep(OUTPUT_QUEUE_READD_TIMEOUT_MS);
@@ -77,6 +88,7 @@ public class LinkExtractorServiceImpl extends AbstractExecutionThreadService imp
 												return;
 											}
 										}
+										log.debug("link to queue added");
 									} catch (MalformedURLException e) {
 										log.error("link {} has wrong href attribute", node.toString());
 									}
@@ -88,6 +100,8 @@ public class LinkExtractorServiceImpl extends AbstractExecutionThreadService imp
 						public void tail(Node node, int depth) {
 						}
 					});
+
+					log.debug("finish link extractor task");
 				}
 			});
 		}

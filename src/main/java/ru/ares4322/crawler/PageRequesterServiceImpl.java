@@ -27,9 +27,9 @@ import static org.slf4j.LoggerFactory.getLogger;
 public class PageRequesterServiceImpl extends AbstractExecutionThreadService implements PageRequesterService {
 
 	private static final Logger log = getLogger(PageRequesterServiceImpl.class);
-	private static final int THREADS = 2;
+	private static final int THREADS = 4;
 	private static final int OUTPUT_QUEUE_READD_TIMEOUT_MS = 5000;
-	private static final int INTPUT_QUEUE_TAKE_TIMEOUT_MS = 1000;
+	private static final int INTPUT_QUEUE_TAKE_TIMEOUT_MS = 10000;
 	private BlockingQueue<URL> inputQueue;
 	private BlockingQueue<String> outputQueue;
 
@@ -37,12 +37,19 @@ public class PageRequesterServiceImpl extends AbstractExecutionThreadService imp
 	private Semaphore controlSemaphore;
 
 	@Override
-	protected void run() throws Exception {
+	protected void startUp() throws Exception {
+		log.debug("start up page requester");
+
 		try {
-			controlSemaphore.acquire();
+			controlSemaphore.acquire(1);
 		} catch (InterruptedException e) {
 			log.error("control semaphore acquire interrupted exception: {}", e);
 		}
+	}
+
+	@Override
+	protected void run() throws Exception {
+		log.debug("run page requester");
 
 		ExecutorService executor = newFixedThreadPool(THREADS, new ThreadFactoryBuilder().setNameFormat("page-requester-%d").build());
 
@@ -55,6 +62,7 @@ public class PageRequesterServiceImpl extends AbstractExecutionThreadService imp
 					controlSemaphore.release();
 					return;
 				}
+				log.debug("get new link for request : {}", url.toString());
 			} catch (InterruptedException e) {
 				log.error("page getting from queue interrupted exception: {}", e);
 				continue;
@@ -62,11 +70,13 @@ public class PageRequesterServiceImpl extends AbstractExecutionThreadService imp
 			executor.submit(new Runnable() {
 				@Override
 				public void run() {
+					log.debug("run page requesting task");
 					try (CloseableHttpClient client = createDefault()) {
 						try (CloseableHttpResponse response = client.execute(new HttpGet(url.toURI()))) {
 							final HttpEntity entity = response.getEntity();
 							final String page = new String(toByteArray(entity.getContent()));
-							while (!outputQueue.add(page)) {
+							log.debug("try add page to queue");
+							while (!outputQueue.offer(page)) {
 								log.debug("output queue is full");
 								try {
 									sleep(OUTPUT_QUEUE_READD_TIMEOUT_MS);
@@ -75,12 +85,15 @@ public class PageRequesterServiceImpl extends AbstractExecutionThreadService imp
 									return;
 								}
 							}
+							log.debug("page to queue added");
 							consume(entity);
 						}
 					} catch (IOException e) {
 						log.error("page getting error: {}", e);
 					} catch (URISyntaxException e) {
 						log.error("page uri error: {}", e);
+					} finally {
+						log.debug("finish  page requesting task");
 					}
 				}
 			});
