@@ -1,6 +1,6 @@
 package ru.ares4322.crawler;
 
-import com.google.inject.Injector;
+import com.google.common.util.concurrent.AbstractExecutionThreadService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,7 +13,7 @@ import java.util.concurrent.Semaphore;
 import static com.google.common.collect.Queues.newArrayBlockingQueue;
 
 @Singleton
-public class CrawlerImpl implements Crawler {
+public class CrawlerImpl extends AbstractExecutionThreadService implements Crawler {
 
 	private static final Logger log = LoggerFactory.getLogger(CrawlerImpl.class);
 	private final static int URL_QUEUE_SIZE = 10;
@@ -23,11 +23,11 @@ public class CrawlerImpl implements Crawler {
 	private PageRequesterService requesterService;
 	@Inject
 	private LinkExtractorService extractorService;
-	@Inject
-	private Injector injector;
 
 	@Override
-	public void start() throws Exception {
+	public void run() throws Exception {
+		log.debug("run crawler");
+
 		BlockingQueue<URL> urlQueue = newArrayBlockingQueue(URL_QUEUE_SIZE);
 		BlockingQueue<String> pageQueue = newArrayBlockingQueue(PAGE_QUEUE_SIZE);
 		Semaphore controlSemaphore = new Semaphore(CONTOL_SEMAPHORE_PERMITS);
@@ -39,10 +39,10 @@ public class CrawlerImpl implements Crawler {
 		extractorService.setOutputQueue(urlQueue);
 		extractorService.setControlSemaphore(controlSemaphore);
 
-		requesterService.start();
-		extractorService.start();
+		urlQueue.add(new URL("http://navtelecom.ru"));    //TODO add start url
 
-		urlQueue.add(null);    //TODO add start url
+		extractorService.startAsync();
+		requesterService.startAsync();
 
 		while (true) {
 			try {
@@ -52,11 +52,14 @@ public class CrawlerImpl implements Crawler {
 				log.error("interrupt on controlSemaphore acquiring: {}", e);
 			}
 		}
+		log.debug("stop crawler");
 	}
 
 	@Override
-	public void stop() throws Exception {
-		requesterService.stop();
-		extractorService.stop();
+	protected void shutDown() {
+		log.debug("shut down crawler");
+
+		requesterService.stopAsync();
+		extractorService.stopAsync();
 	}
 }

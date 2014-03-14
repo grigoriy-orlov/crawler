@@ -1,5 +1,7 @@
 package ru.ares4322.crawler;
 
+import com.google.common.util.concurrent.AbstractExecutionThreadService;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -22,7 +24,7 @@ import static org.apache.http.impl.client.HttpClients.createDefault;
 import static org.apache.http.util.EntityUtils.consume;
 import static org.slf4j.LoggerFactory.getLogger;
 
-public class PageRequesterServiceImpl implements PageRequesterService {
+public class PageRequesterServiceImpl extends AbstractExecutionThreadService implements PageRequesterService {
 
 	private static final Logger log = getLogger(PageRequesterServiceImpl.class);
 	private static final int THREADS = 2;
@@ -35,14 +37,14 @@ public class PageRequesterServiceImpl implements PageRequesterService {
 	private Semaphore controlSemaphore;
 
 	@Override
-	public void start() {
+	protected void run() throws Exception {
 		try {
 			controlSemaphore.acquire();
 		} catch (InterruptedException e) {
 			log.error("control semaphore acquire interrupted exception: {}", e);
 		}
 
-		ExecutorService executor = newFixedThreadPool(THREADS);
+		ExecutorService executor = newFixedThreadPool(THREADS, new ThreadFactoryBuilder().setNameFormat("page-requester-%d").build());
 
 		while (!mustStop) {
 			final URL url;
@@ -85,10 +87,6 @@ public class PageRequesterServiceImpl implements PageRequesterService {
 		}
 	}
 
-	@Override
-	public void stop() {
-		mustStop = true;
-	}
 
 	@Override
 	public void setInputQueue(@NotNull BlockingQueue<URL> inputQueue) {
@@ -103,6 +101,13 @@ public class PageRequesterServiceImpl implements PageRequesterService {
 	@Override
 	public void setControlSemaphore(@NotNull Semaphore semaphore) {
 		this.controlSemaphore = semaphore;
+	}
+
+	@Override
+	public void shutDown() {
+		log.debug("shut down page requester");
+
+		mustStop = true;
 	}
 
 }

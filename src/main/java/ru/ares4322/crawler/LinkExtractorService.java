@@ -1,5 +1,6 @@
 package ru.ares4322.crawler;
 
+import com.google.common.util.concurrent.Service;
 import com.google.inject.ImplementedBy;
 import org.jetbrains.annotations.NotNull;
 
@@ -8,10 +9,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Semaphore;
 
 @ImplementedBy(LinkExtractorServiceImpl.class)
-public interface LinkExtractorService {
-	void start();
-
-	void stop();
+public interface LinkExtractorService extends Service {
 
 	void setInputQueue(@NotNull BlockingQueue<String> inputQueue);
 

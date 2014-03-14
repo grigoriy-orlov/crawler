@@ -16,7 +16,7 @@ public class App {
 
 		Crawler crawler = injector.getInstance(Crawler.class);
 		try {
-			crawler.start();
+			crawler.startAsync().awaitTerminated();
 		} catch (Exception e) {
 			log.error("crawler starting error: {}", e);
 		}
