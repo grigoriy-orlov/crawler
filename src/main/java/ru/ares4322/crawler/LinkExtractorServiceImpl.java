@@ -33,6 +33,7 @@ public class LinkExtractorServiceImpl extends AbstractExecutionThreadService imp
 	private BlockingQueue<URL> outputQueue;
 	private boolean mustStop = false;
 	private Semaphore controlSemaphore;
+	private ExecutorService executor;
 
 	@Override
 	protected void startUp() throws Exception {
@@ -43,13 +44,13 @@ public class LinkExtractorServiceImpl extends AbstractExecutionThreadService imp
 		} catch (InterruptedException e) {
 			log.error("control semaphore acquire interrupted exception: {}", e);
 		}
+
+		executor = newFixedThreadPool(THREADS, new ThreadFactoryBuilder().setNameFormat("link-extractor-%d").build());
 	}
 
 	@Override
 	public void run() {
 		log.debug("run link extractor");
-
-		ExecutorService executor = newFixedThreadPool(THREADS, new ThreadFactoryBuilder().setNameFormat("link-extractor-%d").build());
 
 		while (!mustStop) {
 			final String page;
@@ -112,6 +113,7 @@ public class LinkExtractorServiceImpl extends AbstractExecutionThreadService imp
 		log.debug("shut down link extractor");
 
 		mustStop = true;
+		executor.shutdown();
 	}
 
 	@Override

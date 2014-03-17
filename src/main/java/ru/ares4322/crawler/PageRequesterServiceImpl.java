@@ -35,6 +35,7 @@ public class PageRequesterServiceImpl extends AbstractExecutionThreadService imp
 
 	private boolean mustStop = false;
 	private Semaphore controlSemaphore;
+	private ExecutorService executor;
 
 	@Override
 	protected void startUp() throws Exception {
@@ -45,13 +46,13 @@ public class PageRequesterServiceImpl extends AbstractExecutionThreadService imp
 		} catch (InterruptedException e) {
 			log.error("control semaphore acquire interrupted exception: {}", e);
 		}
+
+		executor = newFixedThreadPool(THREADS, new ThreadFactoryBuilder().setNameFormat("page-requester-%d").build());
 	}
 
 	@Override
 	protected void run() throws Exception {
 		log.debug("run page requester");
-
-		ExecutorService executor = newFixedThreadPool(THREADS, new ThreadFactoryBuilder().setNameFormat("page-requester-%d").build());
 
 		while (!mustStop) {
 			final URL url;
@@ -121,6 +122,7 @@ public class PageRequesterServiceImpl extends AbstractExecutionThreadService imp
 		log.debug("shut down page requester");
 
 		mustStop = true;
+		executor.shutdown();
 	}
 
 }
