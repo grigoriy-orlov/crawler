@@ -68,45 +68,7 @@ public class LinkExtractorServiceImpl extends AbstractExecutionThreadService imp
 				log.error("page getting from queue interrupted exception: {}", e);
 				continue;
 			}
-			executor.submit(new Runnable() {
-				@Override
-				public void run() {
-					log.debug("start link extractor task");
-
-					Document doc = Jsoup.parse(page);
-					Element body = doc.body();
-					body.traverse(new NodeVisitor() {
-						public void head(Node node, int depth) {
-							if ("a".equals(node.nodeName())) {    //TODO add other links node parsing
-								String href = node.attr("href");
-								if (null != href) {
-									try {
-										log.debug("try add link to queue");
-										while (!outputQueue.offer(new URL(href))) {
-											log.debug("output queue is full");
-											try {
-												sleep(props.getLinkExtractorOfferTimeoutMs());
-											} catch (InterruptedException e) {
-												log.error("link putting to queue interrupted exception: {}", e);
-												return;
-											}
-										}
-										log.debug("link to queue added");
-									} catch (MalformedURLException e) {
-										log.error("link {} has wrong href attribute", node.toString());
-									}
-								}
-							}
-						}
-
-						@Override
-						public void tail(Node node, int depth) {
-						}
-					});
-
-					log.debug("finish link extractor task");
-				}
-			});
+			executor.submit(new LinkExtractorTask(page));
 		}
 	}
 
@@ -131,5 +93,51 @@ public class LinkExtractorServiceImpl extends AbstractExecutionThreadService imp
 	@Override
 	public void setControlSemaphore(@NotNull Semaphore semaphore) {
 		this.controlSemaphore = semaphore;
+	}
+
+	private class LinkExtractorTask implements Runnable {
+		private final String page;
+
+		private LinkExtractorTask(String page) {
+			this.page = page;
+		}
+
+		@Override
+		public void run() {
+			log.debug("start link extractor task");
+
+			Document doc = Jsoup.parse(page);
+			Element body = doc.body();
+			body.traverse(new NodeVisitor() {
+				public void head(Node node, int depth) {
+					if ("a".equals(node.nodeName())) {    //TODO add other links node parsing
+						String href = node.attr("href");
+						if (null != href) {
+							try {
+								log.debug("try add link to queue");
+								while (!outputQueue.offer(new URL(href))) {
+									log.debug("output queue is full");
+									try {
+										sleep(props.getLinkExtractorOfferTimeoutMs());
+									} catch (InterruptedException e) {
+										log.error("link putting to queue interrupted exception: {}", e);
+										return;
+									}
+								}
+								log.debug("link to queue added");
+							} catch (MalformedURLException e) {
+								log.error("link {} has wrong href attribute", node.toString());
+							}
+						}
+					}
+				}
+
+				@Override
+				public void tail(Node node, int depth) {
+				}
+			});
+
+			log.debug("finish link extractor task");
+		}
 	}
 }

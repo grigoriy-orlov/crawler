@@ -69,36 +69,7 @@ public class PageRequesterServiceImpl extends AbstractExecutionThreadService imp
 				log.error("page getting from queue interrupted exception: {}", e);
 				continue;
 			}
-			executor.submit(new Runnable() {
-				@Override
-				public void run() {
-					log.debug("run page requesting task");
-					try (CloseableHttpClient client = createDefault()) {
-						try (CloseableHttpResponse response = client.execute(new HttpGet(url.toURI()))) {
-							final HttpEntity entity = response.getEntity();
-							final String page = new String(toByteArray(entity.getContent()));
-							log.debug("try add page to queue");
-							while (!outputQueue.offer(page)) {
-								log.debug("output queue is full");
-								try {
-									sleep(props.getPageRequesterOfferTimeoutMs());
-								} catch (InterruptedException e) {
-									log.error("page putting to queue interrupted exception: {}", e);
-									return;
-								}
-							}
-							log.debug("page to queue added");
-							consume(entity);
-						}
-					} catch (IOException e) {
-						log.error("page getting error: {}", e);
-					} catch (URISyntaxException e) {
-						log.error("page uri error: {}", e);
-					} finally {
-						log.debug("finish  page requesting task");
-					}
-				}
-			});
+			executor.submit(new PageRequesterTask(url));
 		}
 	}
 
@@ -126,4 +97,40 @@ public class PageRequesterServiceImpl extends AbstractExecutionThreadService imp
 		executor.shutdown();
 	}
 
+	private class PageRequesterTask implements Runnable {
+		private final URL url;
+
+		private PageRequesterTask(URL url) {
+			this.url = url;
+		}
+
+		@Override
+		public void run() {
+			log.debug("run page requesting task");
+			try (CloseableHttpClient client = createDefault()) {
+				try (CloseableHttpResponse response = client.execute(new HttpGet(url.toURI()))) {
+					final HttpEntity entity = response.getEntity();
+					final String page = new String(toByteArray(entity.getContent()));
+					log.debug("try add page to queue");
+					while (!outputQueue.offer(page)) {
+						log.debug("output queue is full");
+						try {
+							sleep(props.getPageRequesterOfferTimeoutMs());
+						} catch (InterruptedException e) {
+							log.error("page putting to queue interrupted exception: {}", e);
+							return;
+						}
+					}
+					log.debug("page to queue added");
+					consume(entity);
+				}
+			} catch (IOException e) {
+				log.error("page getting error: {}", e);
+			} catch (URISyntaxException e) {
+				log.error("page uri error: {}", e);
+			} finally {
+				log.debug("finish  page requesting task");
+			}
+		}
+	}
 }
