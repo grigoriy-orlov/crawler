@@ -13,8 +13,7 @@ public class App {
 	public static void main(String[] args) {
 		log.debug("start app");
 
-		Injector injector = createInjector();
-
+		Injector injector = createInjector(new MainModule());
 		Crawler crawler = injector.getInstance(Crawler.class);
 		try {
 			crawler.startAsync().awaitTerminated();

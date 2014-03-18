@@ -16,20 +16,20 @@ import static com.google.common.collect.Queues.newArrayBlockingQueue;
 public class CrawlerImpl extends AbstractExecutionThreadService implements Crawler {
 
 	private static final Logger log = LoggerFactory.getLogger(CrawlerImpl.class);
-	private final static int URL_QUEUE_SIZE = 10;
-	private final static int PAGE_QUEUE_SIZE = 10;
 	private final static int CONTROL_SEMAPHORE_PERMITS = 2;
 	@Inject
 	private PageRequesterService requesterService;
 	@Inject
 	private LinkExtractorService extractorService;
+	@Inject
+	private CrawlerProperties props;
 
 	@Override
 	public void run() throws Exception {
 		log.debug("run crawler");
 
-		BlockingQueue<URL> urlQueue = newArrayBlockingQueue(URL_QUEUE_SIZE);
-		BlockingQueue<String> pageQueue = newArrayBlockingQueue(PAGE_QUEUE_SIZE);
+		BlockingQueue<URL> urlQueue = newArrayBlockingQueue(props.getUrlQueueSize());
+		BlockingQueue<String> pageQueue = newArrayBlockingQueue(props.getPageQueueSize());
 		Semaphore controlSemaphore = new Semaphore(CONTROL_SEMAPHORE_PERMITS);
 
 		requesterService.setInputQueue(urlQueue);
@@ -39,7 +39,9 @@ public class CrawlerImpl extends AbstractExecutionThreadService implements Crawl
 		extractorService.setOutputQueue(urlQueue);
 		extractorService.setControlSemaphore(controlSemaphore);
 
-		urlQueue.add(new URL("http://navtelecom.ru"));    //TODO add start url
+		for (URL startUrl : props.getStartUrls()) {
+			urlQueue.add(startUrl);
+		}
 
 		requesterService.startAsync().awaitRunning();
 		extractorService.startAsync().awaitRunning();

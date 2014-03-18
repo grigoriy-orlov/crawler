@@ -10,6 +10,7 @@ import org.jsoup.nodes.Node;
 import org.jsoup.select.NodeVisitor;
 import org.slf4j.Logger;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -26,14 +27,15 @@ import static org.slf4j.LoggerFactory.getLogger;
 public class LinkExtractorServiceImpl extends AbstractExecutionThreadService implements LinkExtractorService {
 
 	private static final Logger log = getLogger(LinkExtractorServiceImpl.class);
-	private static final int OUTPUT_QUEUE_READD_TIMEOUT_MS = 5000;
-	private static final int INTPUT_QUEUE_TAKE_TIMEOUT_MS = 10000;
-	private static final int THREADS = 4;
 	private BlockingQueue<String> inputQueue;
 	private BlockingQueue<URL> outputQueue;
 	private boolean mustStop = false;
 	private Semaphore controlSemaphore;
 	private ExecutorService executor;
+
+
+	@Inject
+	private CrawlerProperties props;
 
 	@Override
 	protected void startUp() throws Exception {
@@ -45,7 +47,7 @@ public class LinkExtractorServiceImpl extends AbstractExecutionThreadService imp
 			log.error("control semaphore acquire interrupted exception: {}", e);
 		}
 
-		executor = newFixedThreadPool(THREADS, new ThreadFactoryBuilder().setNameFormat("link-extractor-%d").build());
+		executor = newFixedThreadPool(props.getLinkExtractorThreads(), new ThreadFactoryBuilder().setNameFormat("link-extractor-%d").build());
 	}
 
 	@Override
@@ -55,7 +57,7 @@ public class LinkExtractorServiceImpl extends AbstractExecutionThreadService imp
 		while (!mustStop) {
 			final String page;
 			try {
-				page = inputQueue.poll(INTPUT_QUEUE_TAKE_TIMEOUT_MS, MILLISECONDS);
+				page = inputQueue.poll(props.getLinkExtractorPollTimeoutMs(), MILLISECONDS);
 				if (null == page) {
 					log.debug("input queue poll timeout exceed");
 					controlSemaphore.release();
@@ -83,7 +85,7 @@ public class LinkExtractorServiceImpl extends AbstractExecutionThreadService imp
 										while (!outputQueue.offer(new URL(href))) {
 											log.debug("output queue is full");
 											try {
-												sleep(OUTPUT_QUEUE_READD_TIMEOUT_MS);
+												sleep(props.getLinkExtractorOfferTimeoutMs());
 											} catch (InterruptedException e) {
 												log.error("link putting to queue interrupted exception: {}", e);
 												return;

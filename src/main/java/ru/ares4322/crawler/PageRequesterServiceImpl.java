@@ -9,6 +9,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
+import javax.inject.Inject;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -27,15 +28,15 @@ import static org.slf4j.LoggerFactory.getLogger;
 public class PageRequesterServiceImpl extends AbstractExecutionThreadService implements PageRequesterService {
 
 	private static final Logger log = getLogger(PageRequesterServiceImpl.class);
-	private static final int THREADS = 4;
-	private static final int OUTPUT_QUEUE_READD_TIMEOUT_MS = 5000;
-	private static final int INTPUT_QUEUE_TAKE_TIMEOUT_MS = 10000;
 	private BlockingQueue<URL> inputQueue;
 	private BlockingQueue<String> outputQueue;
 
 	private boolean mustStop = false;
 	private Semaphore controlSemaphore;
 	private ExecutorService executor;
+
+	@Inject
+	private CrawlerProperties props;
 
 	@Override
 	protected void startUp() throws Exception {
@@ -47,7 +48,7 @@ public class PageRequesterServiceImpl extends AbstractExecutionThreadService imp
 			log.error("control semaphore acquire interrupted exception: {}", e);
 		}
 
-		executor = newFixedThreadPool(THREADS, new ThreadFactoryBuilder().setNameFormat("page-requester-%d").build());
+		executor = newFixedThreadPool(props.getPageRequesterThreads(), new ThreadFactoryBuilder().setNameFormat("page-requester-%d").build());
 	}
 
 	@Override
@@ -57,7 +58,7 @@ public class PageRequesterServiceImpl extends AbstractExecutionThreadService imp
 		while (!mustStop) {
 			final URL url;
 			try {
-				url = inputQueue.poll(INTPUT_QUEUE_TAKE_TIMEOUT_MS, MILLISECONDS);
+				url = inputQueue.poll(props.getPageRequesterPollTimeoutMs(), MILLISECONDS);
 				if (null == url) {
 					log.debug("input queue poll timeout exceed");
 					controlSemaphore.release();
@@ -80,7 +81,7 @@ public class PageRequesterServiceImpl extends AbstractExecutionThreadService imp
 							while (!outputQueue.offer(page)) {
 								log.debug("output queue is full");
 								try {
-									sleep(OUTPUT_QUEUE_READD_TIMEOUT_MS);
+									sleep(props.getPageRequesterOfferTimeoutMs());
 								} catch (InterruptedException e) {
 									log.error("page putting to queue interrupted exception: {}", e);
 									return;
